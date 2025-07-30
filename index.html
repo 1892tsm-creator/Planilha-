@@ -6,14 +6,23 @@
     <meta name="theme-color" content="#2c3e50">
     <meta name="description" content="Aplicativo de orçamentos para a ADORNECASA">
     <title>ADORNECASA - Orçamentos</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="icons/favicon.ico">
-    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="./manifest.webmanifest">
+    
+    <!-- Favicon e ícones para PWA -->
+    <link rel="icon" href="./icons/favicon.ico">
+    <link rel="apple-touch-icon" href="./icons/icon-192x192.png">
+    
+    <!-- Bibliotecas externas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    
+    <!-- Fontes -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    
     <style>
         :root {
             --cor-primaria: #2c3e50;
@@ -69,7 +78,7 @@
         
         .content {
             padding: 20px;
-            padding-bottom: 80px; /* Espaço para os botões flutuantes */
+            padding-bottom: 80px;
         }
         
         .cliente-section {
@@ -249,6 +258,29 @@
             background-color: var(--cor-secundaria);
         }
         
+        /* Botão de instalação */
+        .install-btn {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background-color: var(--cor-success);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            cursor: pointer;
+            display: none;
+            z-index: 1000;
+            font-weight: 600;
+            border: none;
+            transition: all 0.3s;
+        }
+        
+        .install-btn:hover {
+            background-color: #219653;
+            transform: translateY(-2px);
+        }
+        
         /* Modal */
         .modal {
             display: none;
@@ -380,7 +412,7 @@
             .logo-header {
                 padding: 15px;
             }
-            
+        
             .total-section {
                 padding: 15px;
             }
@@ -472,101 +504,75 @@
         </div>
     </div>
 
-    <!-- Install button -->
-    <div id="installButton" class="fab fab-warning" style="display: none; position: fixed; bottom: 20px; left: 20px;" title="Instalar App">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Botão de instalação do PWA -->
+    <button id="installButton" class="install-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
-    </div>
+        Instalar App
+    </button>
 
     <script>
-        // Verifica se o service worker é suportado
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(registration => {
-                        console.log('ServiceWorker registrado com sucesso:', registration.scope);
-                    })
-                    .catch(error => {
-                        console.log('Falha ao registrar ServiceWorker:', error);
-                    });
-            });
-        }
-
-        // Manipula o botão de instalação
-        let deferredPrompt;
-        const installButton = document.getElementById('installButton');
-
-        window.addEventListener('beforeinstallprompt', (e) => {
-            // Previne o prompt automático
-            e.preventDefault();
-            // Guarda o evento para que possa ser acionado depois
-            deferredPrompt = e;
-            // Mostra o botão de instalação
-            installButton.style.display = 'flex';
-        });
-
-        installButton.addEventListener('click', () => {
-            // Esconde o botão
-            installButton.style.display = 'none';
-            // Mostra o prompt de instalação
-            deferredPrompt.prompt();
-            // Espera pelo resultado da escolha do usuário
-            deferredPrompt.userChoice.then((choiceResult) => {
-                if (choiceResult.outcome === 'accepted') {
-                    console.log('Usuário aceitou a instalação');
-                } else {
-                    console.log('Usuário recusou a instalação');
-                }
-                deferredPrompt = null;
-            });
-        });
-
-        // Verifica se o app já está instalado
-        window.addEventListener('appinstalled', () => {
-            console.log('App instalado com sucesso');
-            installButton.style.display = 'none';
-        });
-
+        // =============================================
+        // CÓDIGO PRINCIPAL DA APLICAÇÃO
+        // =============================================
+        
+        // Variáveis globais
+        let orcamentos = JSON.parse(localStorage.getItem('bibliotecaOrcamentos')) || [];
+        
+        // Inicialização
         document.addEventListener('DOMContentLoaded', function() {
-            // Contador de orçamento
-            let numeroOrcamento = localStorage.getItem('ultimoOrcamento') || 1;
-            document.getElementById('numeroOrcamento').textContent = numeroOrcamento.toString().padStart(3, '0');
+            // Configura número do orçamento
+            let ultimoNumero = localStorage.getItem('ultimoNumeroOrcamento') || 1;
+            document.getElementById('numeroOrcamento').textContent = ultimoNumero.toString().padStart(3, '0');
             
-            // Data atual
+            // Atualiza data atual
             atualizarData();
             
-            // Adicionar item
+            // Adiciona primeiro item
+            adicionarItem();
+            
+            // Configura eventos
+            configurarEventos();
+            
+            // Verifica se há orçamentos salvos
+            if (orcamentos.length > 0) {
+                const ultimoOrcamento = orcamentos[orcamentos.length - 1];
+                if (confirm(`Deseja continuar do último orçamento (#${ultimoOrcamento.numero} - ${ultimoOrcamento.cliente || 'Sem nome'})?`)) {
+                    carregarOrcamento(ultimoOrcamento.id);
+                }
+            }
+            
+            // Configura PWA
+            configurarPWA();
+        });
+        
+        function configurarEventos() {
+            // Botão adicionar item
             document.getElementById('fabAddItem').addEventListener('click', adicionarItem);
             
-            // Gerar PDF
+            // Botão gerar PDF
             document.getElementById('fabGerarPDF').addEventListener('click', gerarPDF);
             
-            // Biblioteca de orçamentos
-            const modalBiblioteca = document.getElementById('modalBiblioteca');
+            // Botão biblioteca
             document.getElementById('fabBiblioteca').addEventListener('click', () => {
                 carregarBiblioteca();
-                modalBiblioteca.style.display = 'flex';
+                document.getElementById('modalBiblioteca').style.display = 'flex';
             });
             
+            // Fechar modal
             document.querySelector('.close-modal').addEventListener('click', () => {
-                modalBiblioteca.style.display = 'none';
+                document.getElementById('modalBiblioteca').style.display = 'none';
             });
             
             // Fechar modal ao clicar fora
-            modalBiblioteca.addEventListener('click', (e) => {
-                if (e.target === modalBiblioteca) {
-                    modalBiblioteca.style.display = 'none';
+            document.getElementById('modalBiblioteca').addEventListener('click', (e) => {
+                if (e.target === document.getElementById('modalBiblioteca')) {
+                    document.getElementById('modalBiblioteca').style.display = 'none';
                 }
             });
-            
-            // Adiciona um item inicial
-            adicionarItem();
-            
-            // Verifica se há um rascunho salvo
-            verificarRascunho();
-        });
+        }
         
         function atualizarData() {
             const data = new Date();
@@ -588,16 +594,16 @@
             
             tbody.appendChild(tr);
             
-            // Adiciona eventos para calcular total
-            tr.querySelector('.quantidade').addEventListener('input', calcularTotal);
-            tr.querySelector('.valor').addEventListener('input', calcularTotal);
+            // Configura eventos do novo item
+            tr.querySelector('.quantidade').addEventListener('input', calcularTotalItem);
+            tr.querySelector('.valor').addEventListener('input', calcularTotalItem);
             tr.querySelector('.remover-item').addEventListener('click', function() {
                 tr.remove();
                 calcularTotalGeral();
             });
         }
         
-        function calcularTotal(event) {
+        function calcularTotalItem(event) {
             const tr = event.target.closest('tr');
             const quantidade = parseFloat(tr.querySelector('.quantidade').value) || 0;
             const valor = parseFloat(tr.querySelector('.valor').value) || 0;
@@ -623,221 +629,4 @@
             const orcamento = {
                 id: Date.now().toString(),
                 numero: document.getElementById('numeroOrcamento').textContent,
-                cliente: document.getElementById('nomeCliente').value,
-                data: document.getElementById('dataAtual').textContent,
-                itens: [],
-                total: document.getElementById('totalOrcamento').textContent,
-                dataCriacao: new Date().toISOString()
-            };
-            
-            document.querySelectorAll('#tabelaItens tbody tr').forEach(tr => {
-                orcamento.itens.push({
-                    descricao: tr.querySelector('.descricao').value,
-                    quantidade: tr.querySelector('.quantidade').value,
-                    valor: tr.querySelector('.valor').value,
-                    total: tr.querySelector('.total-item').textContent
-                });
-            });
-            
-            // Recupera a biblioteca existente ou cria uma nova
-            let biblioteca = JSON.parse(localStorage.getItem('bibliotecaOrcamentos')) || [];
-            
-            // Adiciona o novo orçamento
-            biblioteca.push(orcamento);
-            
-            // Salva no localStorage
-            localStorage.setItem('bibliotecaOrcamentos', JSON.stringify(biblioteca));
-            
-            return orcamento;
-        }
-        
-        function carregarBiblioteca() {
-            const listaOrcamentos = document.getElementById('listaOrcamentos');
-            listaOrcamentos.innerHTML = '';
-            
-            const biblioteca = JSON.parse(localStorage.getItem('bibliotecaOrcamentos')) || [];
-            
-            if (biblioteca.length === 0) {
-                listaOrcamentos.innerHTML = '<li style="text-align: center; padding: 20px;">Nenhum orçamento salvo</li>';
-                return;
-            }
-            
-            // Ordena por data de criação (mais recente primeiro)
-            biblioteca.sort((a, b) => new Date(b.dataCriacao) - new Date(a.dataCriacao));
-            
-            biblioteca.forEach(orcamento => {
-                const li = document.createElement('li');
-                li.innerHTML = `
-                    <div>
-                        <strong>#${orcamento.numero}</strong> - ${orcamento.cliente || 'Sem nome'}
-                        <div style="font-size: 0.8em; color: #666;">
-                            ${orcamento.data} | Total: ${orcamento.total}
-                        </div>
-                    </div>
-                    <div class="orcamento-actions">
-                        <button class="btn btn-primary btn-carregar" data-id="${orcamento.id}">Abrir</button>
-                        <button class="btn btn-danger btn-excluir" data-id="${orcamento.id}">Excluir</button>
-                    </div>
-                `;
-                
-                listaOrcamentos.appendChild(li);
-            });
-            
-            // Adiciona eventos aos botões
-            document.querySelectorAll('.btn-carregar').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const id = this.getAttribute('data-id');
-                    carregarOrcamento(id);
-                    document.getElementById('modalBiblioteca').style.display = 'none';
-                });
-            });
-            
-            document.querySelectorAll('.btn-excluir').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const id = this.getAttribute('data-id');
-                    if (confirm('Tem certeza que deseja excluir este orçamento?')) {
-                        excluirOrcamento(id);
-                        carregarBiblioteca(); // Atualiza a lista
-                    }
-                });
-            });
-        }
-        
-        function carregarOrcamento(id) {
-            const biblioteca = JSON.parse(localStorage.getItem('bibliotecaOrcamentos')) || [];
-            const orcamento = biblioteca.find(o => o.id === id);
-            
-            if (!orcamento) {
-                alert('Orçamento não encontrado!');
-                return;
-            }
-            
-            document.getElementById('numeroOrcamento').textContent = orcamento.numero;
-            document.getElementById('nomeCliente').value = orcamento.cliente;
-            document.getElementById('dataAtual').textContent = orcamento.data;
-            
-            const tbody = document.querySelector('#tabelaItens tbody');
-            tbody.innerHTML = '';
-            
-            orcamento.itens.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><input type="text" class="descricao" value="${item.descricao || ''}"></td>
-                    <td><input type="number" class="quantidade" min="1" value="${item.quantidade || 1}"></td>
-                    <td><input type="number" class="valor" min="0" step="0.01" value="${item.valor || 0}"></td>
-                    <td class="total-item">${item.total || 'R$ 0.00'}</td>
-                    <td><button class="btn btn-danger remover-item">Remover</button></td>
-                `;
-                tbody.appendChild(tr);
-                
-                // Adiciona eventos para calcular total
-                tr.querySelector('.quantidade').addEventListener('input', calcularTotal);
-                tr.querySelector('.valor').addEventListener('input', calcularTotal);
-                tr.querySelector('.remover-item').addEventListener('click', function() {
-                    tr.remove();
-                    calcularTotalGeral();
-                });
-            });
-            
-            document.getElementById('totalOrcamento').textContent = orcamento.total;
-        }
-        
-        function excluirOrcamento(id) {
-            let biblioteca = JSON.parse(localStorage.getItem('bibliotecaOrcamentos')) || [];
-            biblioteca = biblioteca.filter(o => o.id !== id);
-            localStorage.setItem('bibliotecaOrcamentos', JSON.stringify(biblioteca));
-        }
-        
-        function verificarRascunho() {
-            const biblioteca = JSON.parse(localStorage.getItem('bibliotecaOrcamentos')) || [];
-            if (biblioteca.length > 0) {
-                const ultimoOrcamento = biblioteca[biblioteca.length - 1];
-                if (confirm(`Deseja continuar o último orçamento (#${ultimoOrcamento.numero} - ${ultimoOrcamento.cliente || 'Sem nome'})?`)) {
-                    carregarOrcamento(ultimoOrcamento.id);
-                }
-            }
-        }
-        
-        function gerarPDF() {
-            // Salva o orçamento na biblioteca antes de gerar o PDF
-            const orcamento = salvarOrcamento();
-            
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            
-            // Logo e cabeçalho
-            doc.setFontSize(24);
-            doc.setTextColor(44, 62, 80);
-            doc.setFont('helvetica', 'bold');
-            doc.text('ADORNECASA', 105, 20, { align: 'center' });
-            
-            doc.setDrawColor(231, 76, 60);
-            doc.setLineWidth(1);
-            doc.line(20, 25, 190, 25);
-            
-            // Informações do orçamento
-            const nomeCliente = document.getElementById('nomeCliente').value || "Não informado";
-            const numeroOrcamento = document.getElementById('numeroOrcamento').textContent;
-            const data = document.getElementById('dataAtual').textContent;
-            const total = document.getElementById('totalOrcamento').textContent;
-            
-            doc.setFontSize(12);
-            doc.setTextColor(100);
-            doc.text(`Orçamento #${numeroOrcamento}`, 20, 35);
-            doc.text(`Data: ${data}`, 20, 40);
-            doc.text(`Cliente: ${nomeCliente}`, 20, 45);
-            
-            // Tabela de itens
-            const itens = [];
-            document.querySelectorAll('#tabelaItens tbody tr').forEach(tr => {
-                itens.push([
-                    tr.querySelector('.descricao').value || "-",
-                    tr.querySelector('.quantidade').value || "0",
-                    `R$ ${parseFloat(tr.querySelector('.valor').value || 0).toFixed(2)}`,
-                    tr.querySelector('.total-item').textContent
-                ]);
-            });
-            
-            doc.autoTable({
-                head: [['Descrição', 'Qtd.', 'Valor Unitário', 'Total']],
-                body: itens,
-                startY: 55,
-                theme: 'grid',
-                headStyles: {
-                    fillColor: [44, 62, 80],
-                    textColor: 255
-                },
-                alternateRowStyles: {
-                    fillColor: [249, 249, 249]
-                }
-            });
-            
-            // Total
-            const finalY = doc.lastAutoTable.finalY + 10;
-            doc.setFontSize(14);
-            doc.setTextColor(44, 62, 80);
-            doc.text(`Total: R$ ${total}`, 140, finalY);
-            
-            // Rodapé
-            doc.setFontSize(10);
-            doc.setTextColor(150);
-            doc.text('ADORNECASA - Orçamentos Profissionais', 105, 285, { align: 'center' });
-            
-            // Salvar
-            doc.save(`ADORNECASA_Orçamento-${numeroOrcamento}_${nomeCliente}.pdf`);
-            
-            // Incrementa número do orçamento
-            const novoNumero = parseInt(numeroOrcamento) + 1;
-            localStorage.setItem('ultimoOrcamento', novoNumero);
-            document.getElementById('numeroOrcamento').textContent = novoNumero.toString().padStart(3, '0');
-            
-            // Limpa os campos para um novo orçamento
-            document.getElementById('nomeCliente').value = '';
-            document.querySelector('#tabelaItens tbody').innerHTML = '';
-            document.getElementById('totalOrcamento').textContent = '0.00';
-            adicionarItem();
-            atualizarData();
-        }
-    </script>
-</body>
-</html>
+                cliente: document.getElementById('nomeClien
